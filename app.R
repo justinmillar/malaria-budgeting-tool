@@ -1,35 +1,14 @@
+
 library(shiny)
 library(shinydashboard)
 
-# Source UI and server functions for each tab
-source("tabs/tab0-overview/ui.R")
-source("tabs/tab0-overview/server.R")
+#-Source UI and server functions for each tab-----------------------------------
+source("global/source-ui-server-code.R")
 
-source("tabs/tab1a-data-download/ui.R")
-source("tabs/tab1a-data-download/server.R")
-
-source("tabs/tab1b-data-upload/ui.R")
-source("tabs/tab1b-data-upload/server.R")
-
-source("tabs/tab2-input-check/ui.R")
-source("tabs/tab2-input-check/server.R")
-
-source("tabs/tab3-plan-viz/ui.R")
-source("tabs/tab3-plan-viz/server.R")
-
-source("tabs/tab4-plan-comps/ui.R")
-source("tabs/tab4-plan-comps/server.R")
-
-source("tabs/tab5-report-gen/ui.R")
-source("tabs/tab5-report-gen/server.R")
-
-source("tabs/tab6-methods/ui.R")
-source("tabs/tab6-methods/server.R")
-
-# Define UI using shinydashboard
+#-Define UI using shinydashboard------------------------------------------------
 ui <- dashboardPage(
   skin = "red",
-  # Title Nav bar
+  #-Title Nav bar----------------------------
   dashboardHeader(
     title = "Malaria COOP Tool",
     tags$li(class = "dropdown", actionLink("info", icon("info"))),
@@ -51,7 +30,7 @@ ui <- dashboardPage(
     )
   ),
 
-  # Sidebar navigation menu
+  #-Sidebar navigation menu------------------
   dashboardSidebar(
     sidebarMenu(
       menuItem("Overview", tabName = "tab0", icon = icon("gauge-high")),
@@ -70,7 +49,7 @@ ui <- dashboardPage(
     )
   ),
 
-  # Main body of each tab
+  #-Main body of each tab--------------------
   dashboardBody(
     tabItems(
       tabItem(tabName = "tab0", tab0UI("tab0")),
@@ -85,7 +64,7 @@ ui <- dashboardPage(
   )
 )
 
-# Define Server
+#-Define Server-----------------------------------------------------------------
 server <- function(input, output, session) {
   callModule(tab0Server, id = "tab0")
   callModule(tab1aServer, id = "tab1a")
@@ -97,5 +76,5 @@ server <- function(input, output, session) {
   callModule(tab6Server, id = "tab6")
 }
 
-# Run the App
+#-Run the App-------------------------------------------------------------------
 shinyApp(ui, server)
