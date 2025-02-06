@@ -1,0 +1,23 @@
+---
+title: "Test Report"            # Static values for YAML metadata
+author: "HT"                   # (Avoid inline R code here)
+date: "2025-01-31"
+output:
+  pdf_document:
+    latex_engine: pdflatex       # You can switch to pdflatex if needed
+params:
+  report_title: "Test Report"    # Default values for parameters
+  authors_list: "HT"
+  plans: "Plan a"                   # Default: empty list
+---
+
+# Report
+
+**Title:** `r params$report_title`
+
+**Authors:** `r params$authors_list`
+
+**Date of Generation:** `r Sys.Date()`
+
+This is a test report generated for the selected plans:  
+`r if (length(params$plans) > 0) paste(params$plans, collapse = ", ") else "None"`
