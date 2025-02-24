@@ -3,8 +3,14 @@
 library(shiny)
 library(bslib)
 
+
 #-Source UI and server functions for each tab-----------------------------------
 source("global/source-ui-server-code.R")
+source("global/global.R")
+source("global/helpers.R")
+
+# Disable scientific notation globally
+options(scipen = 999)
 
 #-Define UI---------------------------------------------------------------------
 ui <- page_fluid(
@@ -104,7 +110,7 @@ server <- function(input, output, session) {
   callModule(tab1aServer, id = "tab1a")
   # callModule(tab1bServer, id = "tab1b")
   # callModule(tab2Server, id = "tab2")
-  callModule(tab3Server, id = "tab3")
+  callModule(tab3Server, "tab3", lga_outline, state_outline, country_outline, intervention_mix_maps, static_mix_maps)
   callModule(tab4Server, id = "tab4")
   callModule(tab5Server, id = "tab5")
   callModule(tab6Server, id = "tab6")

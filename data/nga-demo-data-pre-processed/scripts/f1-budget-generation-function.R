@@ -1,4 +1,4 @@
-data <- readxl::read_excel("data/nga-demo-data-pre-processed/uploads/intervention-mix-planA.xlsx")
+
 
 create_plan_cost_summary <- function(data){
 
@@ -554,7 +554,7 @@ create_plan_cost_summary <- function(data){
   #-CASE MANAGEMENT-----------------------------------------------------------------
   case_management_quantification <-
     read.csv(
-      "C:/Users/hthompson/Box/budgeting-tool/data-needs/demo-data-nga/cm-quant-data.csv"
+      "data/nga-demo-data-pre-processed/cm-quant-data.csv"
     )
 
   # Compute costs in both NGN and USD
@@ -628,21 +628,33 @@ create_plan_cost_summary <- function(data){
 
   #-LGA INTERVENTION MIX DATA FRAME---------------------------------------------
 
+  # Ensure all datasets have the same column type for `currency`
+  datasets <- list(
+    itn_campaign_quantification,
+    itn_routine_quantifications,
+    iptp_quantifications,
+    smc_quantification,
+    pmc_quantification,
+    vacc_quantification,
+    irs_quantification,
+    lsm_quantification,
+    case_management_quantification
+  )
+
+  # Standardize the 'currency' column type across all datasets
+  datasets <- lapply(datasets, function(df) {
+    if ("currency" %in% colnames(df)) {
+      df <- df |> mutate(currency = as.character(currency))
+    }
+    return(df)
+  })
+
   # Combine all datasets into one
   lga_mix <-
     bind_rows(
-      itn_campaign_quantification,
-      itn_routine_quantifications,
-      iptp_quantifications,
-      smc_quantification,
-      pmc_quantification,
-      vacc_quantification,
-      irs_quantification,
-      lsm_quantification,
-      case_management_quantification
+      datasets
     ) |>
     crossing(year = 2025:2027) |>
-    mutate(class = "Malaria intervention") |>
     fill(plan_shortname, .direction = "downup") |>
     fill(plan_description, .direction = "downup") |>
     fill(adm0, .direction = "downup") |>
@@ -653,35 +665,45 @@ create_plan_cost_summary <- function(data){
               plan_shortname,
               plan_description,
               year,
-              currency,
-              class
+              currency
     ) |>
-    summarise(across(where(is.numeric), \(x) sum(x, na.rm = TRUE)), .groups = "drop")
+    summarise(across(where(is.numeric), \(x) sum(x, na.rm = TRUE)), .groups = "drop") |>
+    left_join(target_population |> select(-adm0, -adm3, -year)) |>
+    # ADD TOTAL BUDGET COL
+    mutate(
+      total_budget = rowSums(across(contains("total_cost")), na.rm = TRUE),
+      total_budget_per_person = total_budget / pop_total
+    )
 
   #-STATE INTERVENTION MIX DATA FRAME-----------------------------------------------
   state_mix <-
     lga_mix |>
+    select(-total_budget, -total_budget_per_person) |>
     group_by(
       adm0,
       adm1,
       plan_shortname,
       plan_description,
       year,
-      currency,
-      class
+      currency
     ) |>
-    summarise(across(where(is.numeric), \(x) sum(x, na.rm = TRUE)), .groups = "drop")
+    summarise(across(where(is.numeric), \(x) sum(x, na.rm = TRUE)), .groups = "drop") |>
+    # ADD TOTAL BUDGET COL
+    mutate(
+      total_budget = rowSums(across(contains("total_cost")), na.rm = TRUE),
+      total_budget_per_person = total_budget / pop_total
+    )
 
   #-NATIONAL INTERVENTION MIX DATA FRAME--------------------------------------------
   national_mix <-
     lga_mix |>
+    select(-total_budget, -total_budget_per_person) |>
     group_by(
       adm0,
       plan_shortname,
       plan_description,
       year,
-      currency,
-      class
+      currency
     ) |>
     summarise(across(where(is.numeric), \(x) sum(x, na.rm = TRUE)), .groups = "drop") |>
     mutate(
@@ -701,11 +723,154 @@ create_plan_cost_summary <- function(data){
     mutate(
       cm_public_total_cost = cm_public_total_cost + cm_eqa_cost,
       itn_campaign_total_cost = itn_campaign_total_cost + itn_campaign_storage_hardware_cost
-    ) |>
+    )
+
+
     #-ADD SUPPORT SERVICES COSTS-------------------------------------------------------
+    # at the national level for ease of working demo
+    national_support_services <-
+      read.csv("data/nga-demo-data-pre-processed/codable-national-data-october.csv") |>
+      select(
+        gf_wd_malaria_long_haul_distribution:rm_total_cost
+      ) |>
+      crossing(currency = c("NGN", "USD")) |>
+      mutate(across(
+         where(is.numeric),  # Apply only to numeric columns
+        ~ ifelse(currency == "USD", . / 1600, .)
+      ))
+
+   national_mix <-
+     national_mix |>
+     left_join(national_support_services, by = "currency") |>
+    mutate(
+      total_budget = rowSums(across(contains("total_cost")), na.rm = TRUE),
+      total_budget_per_person = total_budget / pop_total
+    )
 
 
+    #-MAKE intervention mix map------------------------------------------------------
+   mix_map <-
+     data |>
+     crossing(year = c(2025, 2026, 2027)) |>
+     select(-code_itn_urban) |>
+     # Pivot the data from wide to long format
+     pivot_longer(cols = starts_with("code_"),
+                  names_to = "intervention",
+                  values_to = "value")  |>
+     select(-starts_with("type_")) |>
+     # Filter to keep only rows where the intervention is set to 1
+     filter(value == 1)  |>
+     mutate(intervention = str_remove(intervention, "code_")) |>
+     # create a new column for nicely coded intervention names
+     mutate(
+       intervention_mix_to_show = str_to_upper(intervention)) |>
+     mutate(
+       intervention_mix_to_show = case_when(
+         intervention == "cm_public" ~ "CM",
+         intervention == "iptp" ~ "IPTp",
+         intervention == "vacc" ~ "Vaccine",
+         intervention == "itn_routine" ~ "ITN Routine",
 
+         intervention == "itn_campaign" ~ "ITN Campaign",
+
+         TRUE ~ intervention_mix_to_show)
+     ) |>
+     group_by(adm1, adm2, plan_shortname, plan_description, year)  |>
+     # Concatenate interventions with "+" separator
+     mutate(intervention_summary = paste(intervention_mix_to_show, collapse = " + ")) |>
+     # remove case management private from the mix
+     mutate(intervention_summary =str_remove_all(intervention_summary, "\\s*\\+ CM_PRIVATE$")) |>
+     mutate(intervention_summary =str_remove_all(intervention_summary, "CM_PRIVATE\\s*\\+\\s*")) |>
+     # reduce down
+     select(-intervention, -value, -intervention_mix_to_show) |>
+     distinct()
+
+   mix_shp <-
+    sf::st_read("data/nga-demo-data-pre-processed/shapefiles/lga_shapefile_simp.shp") |>
+     left_join(mix_map, by = c("state" = "adm1",
+                               "lga" = "adm2"))
+
+   static_plot_mix_map <-
+     data |>
+     crossing(year = c(2025, 2026, 2027)) |>
+     select(-code_itn_urban) |>
+     pivot_longer(
+       cols = starts_with("code_"),  # Selects all 'code_*' columns
+       names_to = "intervention",  # New column for intervention names
+       values_to = "code"  # Values from 'code_*' columns
+     ) %>%
+     filter(code == 1) %>%  # Keep only rows where code == 1
+     mutate(
+       intervention_type = case_when(
+         intervention == "code_cm_public" ~ NA,
+         intervention == "code_iptp" ~ type_iptp,
+         intervention == "code_smc" ~ type_smc,
+         intervention == "code_pmc" ~ type_pmc,
+         intervention == "code_vacc" ~ type_vacc,
+         intervention == "code_irs" ~ type_irs,
+         intervention == "code_itn_campaign" ~ type_itn_campaign,
+         intervention == "code_itn_routine" ~ type_itn_routine,
+         intervention == "code_lsm" ~ type_lsm,
+         TRUE ~ NA_character_  # Assigns NA if no matching type column exists
+       )
+     ) %>%
+     mutate(intervention = str_remove(intervention, "code_")) |>
+     # create a new column for nicely coded intervention names
+     mutate(
+       intervention = case_when(
+         intervention == "cm_public" ~ "Case Management Public",
+         intervention == "cm_private" ~ "Case Management Private",
+         intervention == "iptp" ~ "IPTp",
+         intervention == "vacc" ~ "Vaccine",
+         intervention == "itn_routine" ~ "ITN Routine",
+         intervention == "itn_campaign" ~ "ITN Campaign",
+         intervention == "smc" ~ "SMC",
+         intervention == "pmc" ~ "PMC",
+         intervention == "irs" ~ "IRS",
+         intervention == "lsm" ~ "LSM",
+         TRUE ~ intervention)
+     ) |>
+     select(adm0, adm1, adm2, plan_shortname, plan_description, intervention, intervention_type, year)
+
+   static_shp <-
+     sf::st_read("data/nga-demo-data-pre-processed/shapefiles/lga_shapefile_simp.shp") |>
+     left_join(static_plot_mix_map, by = c("state" = "adm1",
+                               "lga" = "adm2"))
+
+
+   #-FORMAT AND SAVE DATA------------------------------------------------------------
+
+   # save intervention mix map
+   sf::st_write(mix_shp,
+                paste0("data/nga-demo-data-pre-processed/shapefiles/",
+                       data$plan_shortname[1],
+                       "-interactive-map.shp"),
+                delete_dsn = TRUE)  # Overwrites existing file
+
+   sf::st_write(static_shp,
+                paste0("data/nga-demo-data-pre-processed/shapefiles/",
+                       data$plan_shortname[1],
+                       "-static-map.shp"),
+                delete_dsn = TRUE)  # Overwrites existing file
+
+   # save raw budgets into single sheet
+
+   # Create a new workbook
+   wb <- openxlsx::createWorkbook()
+
+   # Add each dataframe as a sheet
+   openxlsx::addWorksheet(wb, "LGA")
+   openxlsx::writeData(wb, "LGA", lga_mix)
+
+   openxlsx::addWorksheet(wb, "State")
+   openxlsx::writeData(wb, "State", state_mix)
+
+   openxlsx::addWorksheet(wb, "National")
+   openxlsx::writeData(wb, "National", national_mix)
+
+   # Save workbook
+   openxlsx::saveWorkbook(wb, paste0("data/nga-demo-data-pre-processed/budgets-generated/"
+                           ,data$plan_shortname[1], "-budgets.xlsx"), overwrite = TRUE)
 
 
 }
