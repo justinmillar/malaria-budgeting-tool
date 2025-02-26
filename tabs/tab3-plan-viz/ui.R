@@ -40,7 +40,7 @@ tab3UI <- function(id) {
           selectInput(
             ns("year_select"),
             "Select Years of Interest:",
-            choices = c("", "All Years", years_to_select),
+            choices = c("", years_to_select, "All Years"),
             selected = ""
           ),
 
@@ -48,7 +48,7 @@ tab3UI <- function(id) {
           selectInput(
             ns("currency_select"),
             "Select Currency:",
-            choices = c("", "USD", "Naira"),
+            choices = c("", "USD", "NGN"),
             selected = ""
           )
         ),
@@ -68,10 +68,17 @@ tab3UI <- function(id) {
     # Dynamic text output that appears after inputs are selected
     uiOutput(ns("page_description")),
 
-    # Maps Display (Initially Hidden)
+    # Maps Display
     uiOutput(ns("maps_ui")),
 
     # Ribbon values
-    uiOutput(ns("value_boxes"))
+    uiOutput(ns("value_boxes")),
+
+    # Table summarising Elemental costs
+    uiOutput(ns("budget_table_card")),
+
+    # Additional Charts
+    uiOutput(ns("cost_charts"))
+
   )
 }

@@ -13,6 +13,10 @@ library(readxl)
 library(leaflet)
 library(leaflet.extras2)
 library(sf)
+library(DT)
+library(plotly)
+library(billboarder)
+library(ggthemes)
 
 #-read in usable data-----------------------------------------------------------
 
@@ -45,13 +49,22 @@ state_outline$state[which(state_outline$state == "Akwa-Ibom")] <- "Akwa Ibom"
 
 # plan budget data
 national_budget <- read_xlsx("data/nga-demo-data-pre-processed/budgets-generated/combined-plan-budgets.xlsx",
-                             sheet = "National")
+                             sheet = "National") |>
+  rename(irs_total_cost = irs_campaign_total_cost,
+         cm_private_total_cost = cm_private) |>
+  rename(gf_wd_malaria_long_haul_distribution_cost = gf_wd_malaria_long_haul_distribution,
+         gf_wd_malaria_warehouse_axial_cost = gf_wd_malaria_warehouse_axial,
+         gf_wd_malaria_warehouse_wib_cost = gf_wd_malaria_warehouse_wib)
 
 state_budget <- read_xlsx("data/nga-demo-data-pre-processed/budgets-generated/combined-plan-budgets.xlsx",
-                          sheet = "State")
+                          sheet = "State")|>
+  rename(irs_total_cost = irs_campaign_total_cost,
+         cm_private_total_cost = cm_private)
 
 lga_budget <- read_xlsx("data/nga-demo-data-pre-processed/budgets-generated/combined-plan-budgets.xlsx",
-                          sheet = "LGA")
+                          sheet = "LGA")|>
+  rename(irs_total_cost = irs_campaign_total_cost,
+         cm_private_total_cost = cm_private)
 
 # Extract unique plans and their descriptions, excluding 'baseline'
 unique_plans <- unique(national_budget$plan_shortname)
