@@ -9,6 +9,7 @@ library(shinyjs)
 source("global/source-ui-server-code.R")
 source("global/global.R")
 source("global/helpers.R")
+source("global/figure-download.R")
 
 # Disable scientific notation globally
 options(scipen = 999)

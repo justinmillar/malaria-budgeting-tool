@@ -1,13 +1,39 @@
 tab5Server <- function(input, output, session) {
   ns <- session$ns
 
+  #-Observe universal inputs and enable/disable download buttons-----------------------------
+  observe({
+    all_selected <- (
+      length(input$plan_select) > 0 &&
+        input$plan_select[1] != "" &&  # Check that the first selected value is not ""
+        input$year_select != "" &&
+        input$currency_select != ""
+    )
+
+    if (all_selected) {
+      shinyjs::enable("download_report")
+      shinyjs::enable("download_figures")
+      shinyjs::enable("download_data")
+    } else {
+      shinyjs::disable("download_report")
+      shinyjs::disable("download_figures")
+      shinyjs::disable("download_data")
+    }
+  })
+
+  #-Report Download------------------------------------------------------------------------
   output$download_report <- downloadHandler(
     filename = function() {
-      if (input$report_format == "pdf") {
-        paste0("report-", Sys.Date(), ".pdf")
-      } else {
-        paste0("report-", Sys.Date(), ".docx")
-      }
+      # Collapse multiple plans into a single string for the filename
+      plan_text <- paste(input$plan_select, collapse = "_")
+      paste0(
+        plan_text,
+        "-report-summary-for-",
+        input$year_select,
+        "-date-generated-",
+        Sys.Date(),
+        ".docx"
+      )
     },
     content = function(file) {
       # Define the path to the R Markdown template
@@ -21,12 +47,8 @@ tab5Server <- function(input, output, session) {
       tempReport <- file.path(tempdir(), "report_template.Rmd")
       file.copy(template_path, tempReport, overwrite = TRUE)
 
-      # Determine the output format based on the selection
-      output_format <- if (input$report_format == "pdf") {
-        "pdf_document"
-      } else {
-        "word_document"
-      }
+      # Determine the output format (currently fixed to Word)
+      output_format <- "word_document"
 
       # Render the report using rmarkdown::render with passed parameters
       rmarkdown::render(
@@ -34,12 +56,76 @@ tab5Server <- function(input, output, session) {
         output_format = output_format,
         output_file = file,
         params = list(
-          report_title = input$report_title,
-          authors_list = input$authors_list,
-          plans = input$plans
+          report_title   = input$report_title,
+          authors_list   = input$authors_list,
+          plan_select    = input$plan_select,
+          year_value     = input$year_select,
+          lga_outline    = lga_outline,
+          state_outline  = state_outline,
+          national_budget  = national_budget
         ),
         envir = new.env(parent = globalenv())
       )
     }
+  )
+
+
+
+  #-Figures Download Handler--------------------------------------------------------------
+  output$download_figures <- downloadHandler(
+    filename = function() {
+      paste0("figures-", Sys.Date(), ".zip")
+    },
+    content = function(file) {
+      withProgress(message = 'Generating Figures', value = 0, {
+        # Step 1: Create a temporary directory
+        incProgress(0.1, detail = "Creating temporary folder")
+        tmp_dir <- tempfile("figures")
+        dir.create(tmp_dir)
+
+        # Step 2: Generate the plots based on current inputs
+        incProgress(0.2, detail = "Generating plots")
+        plots <- generate_plots(input$plan_select, input$year_select, input$currency_select)
+
+        # Step 3: Save each plot as a PNG file
+        incProgress(0.2, detail = "Saving plots as PNG files")
+        plot_files <- c()
+        n <- length(plots)
+        for (plot_name in names(plots)) {
+          plot_file <- file.path(tmp_dir, paste0(plot_name, ".png"))
+          png(filename = plot_file, width = 800, height = 600)
+          print(plots[[plot_name]])
+          dev.off()
+          plot_files <- c(plot_files, plot_file)
+          incProgress(0.2 / n, detail = paste("Saved", plot_name))
+        }
+
+        # Step 4: Zip the PNG files
+        incProgress(0.2, detail = "Zipping files")
+        utils::zip(zipfile = file, files = plot_files, flags = "-j")
+
+        incProgress(0.1, detail = "Complete")
+      })
+    },
+    contentType = "application/zip"
+  )
+
+  #-Data Download Handler------------------------------------------------------------------
+  output$download_data <- downloadHandler(
+    filename = function() {
+      paste0("data-", Sys.Date(), ".xlsx")
+    },
+    content = function(file) {
+      # For demonstration: create a dummy data frame.
+      data <- data.frame(
+        Plan = input$plan_select,
+        Year = input$year_select,
+        Currency = input$currency_select,
+        Value = runif(length(input$plan_select), 100, 500)
+      )
+
+      writexl::write_xlsx(data, path = file)
+    },
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 }
