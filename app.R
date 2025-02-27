@@ -2,6 +2,7 @@
 #-Packages----------------------------------------------------------------------
 library(shiny)
 library(bslib)
+library(shinyjs)
 
 
 #-Source UI and server functions for each tab-----------------------------------
@@ -16,6 +17,7 @@ options(scipen = 999)
 #-Define UI---------------------------------------------------------------------
 ui <- page_fluid(
   theme = bs_theme(version = 5, bootswatch = "minty"),
+  useShinyjs(),
 
   # Add custom CSS for fixed full-height sidebar
   tags$head(
@@ -108,7 +110,8 @@ server <- function(input, output, session) {
 
   #=Call modules for each tab------------------------
   callModule(tab0Server, id = "tab0")
-  callModule(tab1aServer, id = "tab1a")
+  callModule(tab1aServer, id = "tab1a", template_file_path, SCENARIO_COLS, COST_COLS, TEMPLATE_ADMIN_DATA)
+  # tab1aServer("tab1a")
   # callModule(tab1bServer, id = "tab1b")
   # callModule(tab2Server, id = "tab2")
   callModule(tab3Server, "tab3", lga_outline, state_outline, country_outline, intervention_mix_maps, static_mix_maps)
