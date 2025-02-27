@@ -7,3 +7,6 @@
 uploads/
 scenario_uploads.db
 cost_uploads.db
+
+# Don't include the rsconnect folder
+rsconnect/
