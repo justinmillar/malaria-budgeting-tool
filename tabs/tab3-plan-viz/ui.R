@@ -19,7 +19,8 @@ tab3UI <- function(id) {
             ns("plan_select"),
             "Select the Plan:",
             choices = c("", unique_plans),
-            selected = ""
+            selected = "",
+            multiple = TRUE
           ),
 
           # Spatial Scale Selection

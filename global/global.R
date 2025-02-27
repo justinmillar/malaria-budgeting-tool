@@ -17,6 +17,10 @@ library(DT)
 library(plotly)
 library(billboarder)
 library(ggthemes)
+library(shinyjs)
+library(writexl)
+library(webshot2)
+library(htmlwidgets)
 
 #-read in usable data-----------------------------------------------------------
 
